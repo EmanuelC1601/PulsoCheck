@@ -28,7 +28,7 @@ El proyecto se construirá en pasos pequeños. Antes de añadir una función, re
 
 - [x] Alcance de la propuesta revisado
 - [x] Repositorio local aislado preparado
-- [ ] Proyecto Android Studio creado y compilado
+- [x] Proyecto Android Studio creado y compilado
 - [ ] Modelo de datos y almacenamiento local
 - [ ] Flujo de respuesta en Wear OS
 - [ ] Sincronización Wearable Data Layer
@@ -38,3 +38,4 @@ El proyecto se construirá en pasos pequeños. Antes de añadir una función, re
 ## Documentación
 
 - [Plan de trabajo](docs/plan-de-trabajo.md)
+- [Complemento de la propuesta: arquitectura, patrones y funciones](docs/complemento-propuesta.md)
