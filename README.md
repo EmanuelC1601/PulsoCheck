@@ -39,3 +39,4 @@ El proyecto se construirá en pasos pequeños. Antes de añadir una función, re
 
 - [Plan de trabajo](docs/plan-de-trabajo.md)
 - [Complemento de la propuesta: arquitectura, patrones y funciones](docs/complemento-propuesta.md)
+- [Complemento de la propuesta en PDF](docs/Complemento_Propuesta_PulsoCheck.pdf)
