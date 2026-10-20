@@ -3,6 +3,14 @@
 
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- En relojes Wear OS 5.1 o anteriores se solicita este permiso para leer el pulso. -->
+    <uses-permission
+        android:name="android.permission.BODY_SENSORS"
+        android:maxSdkVersion="35" />
+
+    <!-- En Wear OS 6 (API 36) y posteriores se usa el permiso nuevo de Health Services. -->
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+
     <uses-feature android:name="android.hardware.type.watch" />
 
     <application

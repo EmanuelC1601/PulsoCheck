@@ -55,5 +55,9 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.room.runtime)
+    // Health Services ofrece acceso uniforme a los sensores de salud compatibles del reloj.
+    implementation(libs.androidx.health.services.client)
+    // Health Services expone ListenableFuture en su API; se declara para que Kotlin pueda compilarla.
+    implementation(libs.google.guava.listenablefuture)
     ksp(libs.androidx.room.compiler)
 }
