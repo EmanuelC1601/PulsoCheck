@@ -5,13 +5,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material3.AppScaffold
-import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.SurfaceTransformation
@@ -21,94 +21,100 @@ import androidx.wear.compose.material3.lazy.transformedHeight
 import androidx.wear.compose.ui.tooling.preview.WearPreviewDevices
 import androidx.wear.compose.ui.tooling.preview.WearPreviewFontScales
 import mx.edu.uttt.pulsocheck.R
+import mx.edu.uttt.pulsocheck.data.local.database.PulsoCheckDatabase
+import mx.edu.uttt.pulsocheck.data.repository.RoomHeartRateReadingRepository
+import mx.edu.uttt.pulsocheck.domain.model.HeartRateReading
 import mx.edu.uttt.pulsocheck.presentation.theme.PulsoCheckTheme
 
-// Activity es el punto de entrada de esta aplicación Wear OS.
+// Activity es el punto de entrada y conecta las dependencias de la aplicación.
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Compose construye la pantalla del reloj.
+        // Construye la cadena de almacenamiento: base de datos -> DAO -> repositorio.
+        val database = PulsoCheckDatabase.obtenerInstancia(applicationContext)
+        val repository = RoomHeartRateReadingRepository(
+            database.heartRateReadingDao(),
+        )
+        val viewModelFactory = TrackingViewModelFactory(repository)
+
+        // ViewModelProvider conserva el ViewModel durante cambios de configuración.
+        val trackingViewModel = ViewModelProvider(
+            this,
+            viewModelFactory,
+        )[TrackingViewModel::class.java]
+
+        // Compose recibe el ViewModel ya configurado con el repositorio.
         setContent {
-            WearApp()
+            WearApp(trackingViewModel)
         }
     }
 }
 
+/** Observa las lecturas del ViewModel y las entrega a la pantalla. */
 @Composable
-fun WearApp() {
-    // Obtiene el ViewModel que mantiene el estado de esta pantalla.
-    val trackingViewModel: TrackingViewModel = viewModel()
-
-    // Compose observa este valor y vuelve a dibujar la pantalla cuando cambia.
-    val seguimientoActivo = trackingViewModel.seguimientoActivo.value
+fun WearApp(trackingViewModel: TrackingViewModel) {
+    val readings = trackingViewModel.lecturas.collectAsState().value
 
     PulsoCheckTheme {
-        AppScaffold {
-            val listState = rememberTransformingLazyColumnState()
-            val transformationSpec = rememberTransformationSpec()
+        WearHomeScreen(readings)
+    }
+}
 
-            ScreenScaffold(
-                scrollState = listState,
-            ) { contentPadding ->
-                TransformingLazyColumn(
-                    contentPadding = contentPadding,
-                    state = listState,
-                ) {
-                    // Encabezado con el nombre definido en strings.xml.
-                    item {
-                        ListHeader(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .transformedHeight(this, transformationSpec),
-                            transformation = SurfaceTransformation(transformationSpec),
-                        ) {
-                            Text(text = stringResource(R.string.app_name))
-                        }
-                    }
+/** Interfaz pura: recibe datos y no consulta directamente al ViewModel ni a Room. */
+@Composable
+private fun WearHomeScreen(readings: List<HeartRateReading>) {
+    AppScaffold {
+        val listState = rememberTransformingLazyColumnState()
+        val transformationSpec = rememberTransformationSpec()
 
-                    // El botón envía una acción al ViewModel.
-                    item {
-                        Button(
-                            onClick = {
-                                trackingViewModel.alternarSeguimiento()
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .transformedHeight(this, transformationSpec),
-                            transformation = SurfaceTransformation(transformationSpec),
-                        ) {
-                            Text(
-                                text = if (seguimientoActivo) {
-                                    "Detener demo"
-                                } else {
-                                    "Iniciar demo"
-                                }
-                            )
-                        }
+        ScreenScaffold(
+            scrollState = listState,
+        ) { contentPadding ->
+            TransformingLazyColumn(
+                contentPadding = contentPadding,
+                state = listState,
+            ) {
+                item {
+                    ListHeader(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .transformedHeight(this, transformationSpec),
+                        transformation = SurfaceTransformation(transformationSpec),
+                    ) {
+                        Text(text = stringResource(R.string.app_name))
                     }
+                }
 
-                    // Indica el estado actual de la demostración.
-                    item {
-                        Text(
-                            text = if (seguimientoActivo) {
-                                "Demostración activa"
-                            } else {
-                                "Seguimiento detenido"
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
+                item {
+                    Text(
+                        text = "Lecturas guardadas: ${readings.size}",
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+
+                item {
+                    val latestReading = readings.firstOrNull()
+                    val message = latestReading?.let { reading ->
+                        "Última lectura: ${reading.beatsPerMinute} lpm"
+                    } ?: "Sin lecturas guardadas"
+
+                    Text(
+                        text = message,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
         }
     }
 }
 
-// Vista previa para revisar el diseño del reloj en Android Studio.
+// La vista previa usa una lista vacía y no necesita abrir la base de datos.
 @WearPreviewDevices
 @WearPreviewFontScales
 @Composable
 fun DefaultPreview() {
-    WearApp()
+    PulsoCheckTheme {
+        WearHomeScreen(readings = emptyList())
+    }
 }

@@ -1,19 +1,35 @@
 package mx.edu.uttt.pulsocheck.presentation
 
-import androidx.compose.runtime.State
-import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import mx.edu.uttt.pulsocheck.domain.model.HeartRateReading
+import mx.edu.uttt.pulsocheck.domain.repository.HeartRateReadingRepository
 
-class TrackingViewModel : ViewModel() {
+/**
+ * Prepara los datos que la pantalla del reloj necesita mostrar.
+ *
+ * El ViewModel observa el repositorio y no conoce directamente Room.
+ */
+class TrackingViewModel(
+    private val readingRepository: HeartRateReadingRepository,
+) : ViewModel() {
 
-    // Estado interno: solo el ViewModel puede cambiarlo.
-    private val _seguimientoActivo = mutableStateOf(false)
+    // Estado privado: solo el ViewModel puede actualizar la lista.
+    private val _lecturas = MutableStateFlow<List<HeartRateReading>>(emptyList())
 
-    // La pantalla puede leer el estado, pero no modificarlo directamente.
-    val seguimientoActivo: State<Boolean> = _seguimientoActivo
+    // La interfaz observa este StateFlow y se refresca cuando llegan cambios.
+    val lecturas: StateFlow<List<HeartRateReading>> = _lecturas.asStateFlow()
 
-    // Por ahora alterna la demostración; más adelante iniciará el sensor.
-    fun alternarSeguimiento() {
-        _seguimientoActivo.value = !_seguimientoActivo.value
+    init {
+        // viewModelScope cancela esta tarea cuando el ViewModel deja de existir.
+        viewModelScope.launch {
+            readingRepository.observarTodas().collect { lecturasGuardadas ->
+                _lecturas.value = lecturasGuardadas
+            }
+        }
     }
 }
