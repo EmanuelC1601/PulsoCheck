@@ -14,6 +14,7 @@ import mx.edu.uttt.pulsocheck.domain.config.HeartRateMonitoringConfig
 import mx.edu.uttt.pulsocheck.domain.model.HeartRateEpisode
 import mx.edu.uttt.pulsocheck.domain.model.HeartRateReading
 import mx.edu.uttt.pulsocheck.domain.model.ReadingOrigin
+import mx.edu.uttt.pulsocheck.domain.repository.HeartRateEpisodeRepository
 import mx.edu.uttt.pulsocheck.domain.repository.HeartRateReadingRepository
 import mx.edu.uttt.pulsocheck.domain.usecase.DetectHeartRateEpisodesUseCase
 
@@ -35,6 +36,7 @@ enum class TrackingStatus {
  */
 class TrackingViewModel(
     private val readingRepository: HeartRateReadingRepository,
+    private val episodeRepository: HeartRateEpisodeRepository,
     private val heartRateDataSource: HealthServicesHeartRateDataSource,
     private val monitoringConfig: HeartRateMonitoringConfig =
         HeartRateMonitoringConfig(),
@@ -59,17 +61,27 @@ class TrackingViewModel(
     private var tareaDeLectura: Job? = null
 
     init {
+        // Room emite los episodios guardados cada vez que la tabla cambia.
+        viewModelScope.launch {
+            episodeRepository.observarTodos().collect { episodiosGuardados ->
+                _episodios.value = episodiosGuardados
+            }
+        }
+
         // Room emite una lista nueva cada vez que cambian las lecturas.
         viewModelScope.launch {
             readingRepository.observarTodas().collect { lecturasGuardadas ->
                 _lecturas.value = lecturasGuardadas
 
                 // Aplicamos la regla del dominio usando los parámetros configurados.
-                _episodios.value = detectEpisodes(
+                val episodiosDetectados = detectEpisodes(
                     readings = lecturasGuardadas,
                     thresholdBpm = monitoringConfig.thresholdBpm,
                     maximumGapMillis = monitoringConfig.maximumGapMillis,
                 )
+
+                // Al guardar, el flujo de Room actualiza el estado de episodios.
+                episodeRepository.guardarTodos(episodiosDetectados)
             }
         }
     }

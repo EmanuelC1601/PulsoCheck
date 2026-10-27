@@ -30,6 +30,7 @@ import androidx.wear.compose.ui.tooling.preview.WearPreviewDevices
 import androidx.wear.compose.ui.tooling.preview.WearPreviewFontScales
 import mx.edu.uttt.pulsocheck.R
 import mx.edu.uttt.pulsocheck.data.local.database.PulsoCheckDatabase
+import mx.edu.uttt.pulsocheck.data.repository.RoomHeartRateEpisodeRepository
 import mx.edu.uttt.pulsocheck.data.repository.RoomHeartRateReadingRepository
 import mx.edu.uttt.pulsocheck.data.sensor.HealthServicesHeartRateDataSource
 import mx.edu.uttt.pulsocheck.domain.model.EpisodeStatus
@@ -44,11 +45,19 @@ class MainActivity : ComponentActivity() {
 
         // Construye la cadena de almacenamiento: base de datos -> DAO -> repositorio.
         val database = PulsoCheckDatabase.obtenerInstancia(applicationContext)
-        val repository = RoomHeartRateReadingRepository(
+        val readingRepository = RoomHeartRateReadingRepository(
             database.heartRateReadingDao(),
         )
+        // Este repositorio guarda los episodios calculados por el dominio.
+        val episodeRepository = RoomHeartRateEpisodeRepository(
+            database.heartRateEpisodeDao(),
+        )
         val heartRateDataSource = HealthServicesHeartRateDataSource(applicationContext)
-        val viewModelFactory = TrackingViewModelFactory(repository, heartRateDataSource)
+        val viewModelFactory = TrackingViewModelFactory(
+            readingRepository = readingRepository,
+            episodeRepository = episodeRepository,
+            heartRateDataSource = heartRateDataSource,
+        )
 
         // ViewModelProvider conserva el ViewModel durante cambios de configuración.
         val viewModel = ViewModelProvider(
