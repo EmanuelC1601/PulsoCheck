@@ -11,9 +11,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import mx.edu.uttt.pulsocheck.data.sensor.HealthServicesHeartRateDataSource
 import mx.edu.uttt.pulsocheck.domain.config.HeartRateMonitoringConfig
+import mx.edu.uttt.pulsocheck.domain.model.EpisodeResponse
+import mx.edu.uttt.pulsocheck.domain.model.EpisodeStatus
+import mx.edu.uttt.pulsocheck.domain.model.FeelingOption
 import mx.edu.uttt.pulsocheck.domain.model.HeartRateEpisode
 import mx.edu.uttt.pulsocheck.domain.model.HeartRateReading
 import mx.edu.uttt.pulsocheck.domain.model.ReadingOrigin
+import mx.edu.uttt.pulsocheck.domain.repository.EpisodeResponseRepository
 import mx.edu.uttt.pulsocheck.domain.repository.HeartRateEpisodeRepository
 import mx.edu.uttt.pulsocheck.domain.repository.HeartRateReadingRepository
 import mx.edu.uttt.pulsocheck.domain.usecase.DetectHeartRateEpisodesUseCase
@@ -37,6 +41,7 @@ enum class TrackingStatus {
 class TrackingViewModel(
     private val readingRepository: HeartRateReadingRepository,
     private val episodeRepository: HeartRateEpisodeRepository,
+    private val responseRepository: EpisodeResponseRepository,
     private val heartRateDataSource: HealthServicesHeartRateDataSource,
     private val monitoringConfig: HeartRateMonitoringConfig =
         HeartRateMonitoringConfig(),
@@ -52,6 +57,14 @@ class TrackingViewModel(
     private val _episodios = MutableStateFlow<List<HeartRateEpisode>>(emptyList())
     val episodios: StateFlow<List<HeartRateEpisode>> = _episodios.asStateFlow()
 
+    // La pantalla muestra la pregunta solo para episodios cerrados sin respuesta.
+    private val _episodioPendienteDeRespuesta = MutableStateFlow<HeartRateEpisode?>(null)
+    val episodioPendienteDeRespuesta: StateFlow<HeartRateEpisode?> =
+        _episodioPendienteDeRespuesta.asStateFlow()
+
+    // Se conserva la lista para saber cuáles episodios ya tienen una respuesta.
+    private val _respuestas = MutableStateFlow<List<EpisodeResponse>>(emptyList())
+
     // La pantalla observa este estado para mostrar qué sucede con el sensor.
     private val _estadoSeguimiento = MutableStateFlow(TrackingStatus.IDLE)
     val estadoSeguimiento: StateFlow<TrackingStatus> =
@@ -65,6 +78,15 @@ class TrackingViewModel(
         viewModelScope.launch {
             episodeRepository.observarTodos().collect { episodiosGuardados ->
                 _episodios.value = episodiosGuardados
+                actualizarEpisodioPendiente()
+            }
+        }
+
+        // Las respuestas guardadas ocultan la pregunta correspondiente.
+        viewModelScope.launch {
+            responseRepository.observarTodas().collect { respuestasGuardadas ->
+                _respuestas.value = respuestasGuardadas
+                actualizarEpisodioPendiente()
             }
         }
 
@@ -133,6 +155,34 @@ class TrackingViewModel(
         tareaDeLectura?.cancel()
         tareaDeLectura = null
         _estadoSeguimiento.value = TrackingStatus.IDLE
+    }
+
+    /** Guarda cómo se siente la persona para el episodio pendiente. */
+    fun registrarRespuesta(feeling: FeelingOption) {
+        val episodio = _episodioPendienteDeRespuesta.value ?: return
+
+        viewModelScope.launch {
+            responseRepository.guardar(
+                EpisodeResponse(
+                    episodeId = episodio.id,
+                    feeling = feeling,
+                    answeredAtEpochMillis = System.currentTimeMillis(),
+                ),
+            )
+        }
+    }
+
+    /** Busca el episodio cerrado más reciente que todavía no tenga respuesta. */
+    private fun actualizarEpisodioPendiente() {
+        val idsConRespuesta = _respuestas.value.mapTo(mutableSetOf()) { respuesta ->
+            respuesta.episodeId
+        }
+
+        _episodioPendienteDeRespuesta.value = _episodios.value
+            .filter { episodio ->
+                episodio.status == EpisodeStatus.CLOSED && episodio.id !in idsConRespuesta
+            }
+            .maxByOrNull { episodio -> episodio.startedAtEpochMillis }
     }
 
     /** Actualiza el estado si la persona rechaza el permiso del sensor. */

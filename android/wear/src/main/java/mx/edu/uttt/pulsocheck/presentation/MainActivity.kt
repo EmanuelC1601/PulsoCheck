@@ -30,10 +30,12 @@ import androidx.wear.compose.ui.tooling.preview.WearPreviewDevices
 import androidx.wear.compose.ui.tooling.preview.WearPreviewFontScales
 import mx.edu.uttt.pulsocheck.R
 import mx.edu.uttt.pulsocheck.data.local.database.PulsoCheckDatabase
+import mx.edu.uttt.pulsocheck.data.repository.RoomEpisodeResponseRepository
 import mx.edu.uttt.pulsocheck.data.repository.RoomHeartRateEpisodeRepository
 import mx.edu.uttt.pulsocheck.data.repository.RoomHeartRateReadingRepository
 import mx.edu.uttt.pulsocheck.data.sensor.HealthServicesHeartRateDataSource
 import mx.edu.uttt.pulsocheck.domain.model.EpisodeStatus
+import mx.edu.uttt.pulsocheck.domain.model.FeelingOption
 import mx.edu.uttt.pulsocheck.domain.model.HeartRateEpisode
 import mx.edu.uttt.pulsocheck.domain.model.HeartRateReading
 import mx.edu.uttt.pulsocheck.presentation.theme.PulsoCheckTheme
@@ -52,10 +54,15 @@ class MainActivity : ComponentActivity() {
         val episodeRepository = RoomHeartRateEpisodeRepository(
             database.heartRateEpisodeDao(),
         )
+        // Las respuestas de bienestar también se guardan localmente en Room.
+        val responseRepository = RoomEpisodeResponseRepository(
+            database.episodeResponseDao(),
+        )
         val heartRateDataSource = HealthServicesHeartRateDataSource(applicationContext)
         val viewModelFactory = TrackingViewModelFactory(
             readingRepository = readingRepository,
             episodeRepository = episodeRepository,
+            responseRepository = responseRepository,
             heartRateDataSource = heartRateDataSource,
         )
 
@@ -90,6 +97,8 @@ fun WearApp(trackingViewModel: TrackingViewModel) {
     val context = LocalContext.current
     // Compose vuelve a dibujar la pantalla cuando cambia la lista de episodios.
     val episodes = trackingViewModel.episodios.collectAsState().value
+    val pendingEpisode =
+        trackingViewModel.episodioPendienteDeRespuesta.collectAsState().value
 
     // Android requiere pedir este permiso justo cuando la persona inicia la lectura.
     val heartRatePermission = if (Build.VERSION.SDK_INT >= 36) {
@@ -110,6 +119,7 @@ fun WearApp(trackingViewModel: TrackingViewModel) {
     PulsoCheckTheme {
         WearHomeScreen(
             episodes = episodes,
+            pendingEpisode = pendingEpisode,
             readings = readings,
             trackingStatus = trackingStatus,
             onStart = {
@@ -125,6 +135,7 @@ fun WearApp(trackingViewModel: TrackingViewModel) {
                 }
             },
             onStop = trackingViewModel::detenerSeguimiento,
+            onFeelingSelected = trackingViewModel::registrarRespuesta,
         )
     }
 }
@@ -134,9 +145,11 @@ fun WearApp(trackingViewModel: TrackingViewModel) {
 private fun WearHomeScreen(
     readings: List<HeartRateReading>,
     episodes: List<HeartRateEpisode>,
+    pendingEpisode: HeartRateEpisode?,
     trackingStatus: TrackingStatus,
     onStart: () -> Unit,
     onStop: () -> Unit,
+    onFeelingSelected: (FeelingOption) -> Unit,
 ) {
     AppScaffold {
         val listState = rememberTransformingLazyColumnState()
@@ -223,6 +236,48 @@ private fun WearHomeScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
+
+                if (pendingEpisode != null) {
+                    item {
+                        Text(
+                            text = "¿Cómo te sientes después de este episodio?",
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+
+                    item {
+                        Button(
+                            onClick = {
+                                onFeelingSelected(FeelingOption.GOOD)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("Bien")
+                        }
+                    }
+
+                    item {
+                        Button(
+                            onClick = {
+                                onFeelingSelected(FeelingOption.OKAY)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("Regular")
+                        }
+                    }
+
+                    item {
+                        Button(
+                            onClick = {
+                                onFeelingSelected(FeelingOption.BAD)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("Mal")
+                        }
+                    }
+                }
             }
         }
     }
@@ -237,9 +292,11 @@ fun DefaultPreview() {
         WearHomeScreen(
             readings = emptyList(),
             episodes = emptyList(),
+            pendingEpisode = null,
             trackingStatus = TrackingStatus.IDLE,
             onStart = {},
             onStop = {},
+            onFeelingSelected = {},
         )
     }
 }

@@ -3,6 +3,7 @@ package mx.edu.uttt.pulsocheck.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import mx.edu.uttt.pulsocheck.data.sensor.HealthServicesHeartRateDataSource
+import mx.edu.uttt.pulsocheck.domain.repository.EpisodeResponseRepository
 import mx.edu.uttt.pulsocheck.domain.repository.HeartRateEpisodeRepository
 import mx.edu.uttt.pulsocheck.domain.repository.HeartRateReadingRepository
 
@@ -12,6 +13,7 @@ import mx.edu.uttt.pulsocheck.domain.repository.HeartRateReadingRepository
 class TrackingViewModelFactory(
     private val readingRepository: HeartRateReadingRepository,
     private val episodeRepository: HeartRateEpisodeRepository,
+    private val responseRepository: EpisodeResponseRepository,
     private val heartRateDataSource: HealthServicesHeartRateDataSource,
 ) : ViewModelProvider.Factory {
 
@@ -25,6 +27,7 @@ class TrackingViewModelFactory(
         return TrackingViewModel(
             readingRepository = readingRepository,
             episodeRepository = episodeRepository,
+            responseRepository = responseRepository,
             heartRateDataSource = heartRateDataSource,
         ) as T
     }
