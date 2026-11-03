@@ -14,7 +14,8 @@
     <uses-feature android:name="android.hardware.type.watch" />
 
     <application
-        android:allowBackup="true"
+        <!-- Las lecturas de salud permanecen en el reloj y no entran en copias cloud. -->
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"

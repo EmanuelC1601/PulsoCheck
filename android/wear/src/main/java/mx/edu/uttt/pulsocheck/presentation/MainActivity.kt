@@ -34,6 +34,7 @@ import mx.edu.uttt.pulsocheck.data.repository.RoomEpisodeResponseRepository
 import mx.edu.uttt.pulsocheck.data.repository.RoomHeartRateEpisodeRepository
 import mx.edu.uttt.pulsocheck.data.repository.RoomHeartRateReadingRepository
 import mx.edu.uttt.pulsocheck.data.sensor.HealthServicesHeartRateDataSource
+import mx.edu.uttt.pulsocheck.data.sync.HeartRateDataLayerSender
 import mx.edu.uttt.pulsocheck.domain.model.EpisodeStatus
 import mx.edu.uttt.pulsocheck.domain.model.FeelingOption
 import mx.edu.uttt.pulsocheck.domain.model.HeartRateEpisode
@@ -59,11 +60,13 @@ class MainActivity : ComponentActivity() {
             database.episodeResponseDao(),
         )
         val heartRateDataSource = HealthServicesHeartRateDataSource(applicationContext)
+        val dataLayerSender = HeartRateDataLayerSender(applicationContext)
         val viewModelFactory = TrackingViewModelFactory(
             readingRepository = readingRepository,
             episodeRepository = episodeRepository,
             responseRepository = responseRepository,
             heartRateDataSource = heartRateDataSource,
+            dataLayerSender = dataLayerSender,
         )
 
         // ViewModelProvider conserva el ViewModel durante cambios de configuración.

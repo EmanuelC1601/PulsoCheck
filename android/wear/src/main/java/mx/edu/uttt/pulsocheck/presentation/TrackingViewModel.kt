@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import mx.edu.uttt.pulsocheck.data.sensor.HealthServicesHeartRateDataSource
+import mx.edu.uttt.pulsocheck.data.sync.HeartRateDataLayerSender
 import mx.edu.uttt.pulsocheck.domain.config.HeartRateMonitoringConfig
 import mx.edu.uttt.pulsocheck.domain.model.EpisodeResponse
 import mx.edu.uttt.pulsocheck.domain.model.EpisodeStatus
@@ -43,6 +44,7 @@ class TrackingViewModel(
     private val episodeRepository: HeartRateEpisodeRepository,
     private val responseRepository: EpisodeResponseRepository,
     private val heartRateDataSource: HealthServicesHeartRateDataSource,
+    private val dataLayerSender: HeartRateDataLayerSender,
     private val monitoringConfig: HeartRateMonitoringConfig =
         HeartRateMonitoringConfig(),
     private val detectEpisodes: DetectHeartRateEpisodesUseCase =
@@ -136,6 +138,9 @@ class TrackingViewModel(
 
                     // Al guardar, Room emite la lista actualizada y se recalculan episodios.
                     readingRepository.guardar(reading)
+
+                    // El reloj conserva su copia local y además la envía al teléfono.
+                    dataLayerSender.enviar(reading)
                 }
             } catch (error: SecurityException) {
                 // Puede ocurrir si se revoca el permiso desde Ajustes del reloj.
