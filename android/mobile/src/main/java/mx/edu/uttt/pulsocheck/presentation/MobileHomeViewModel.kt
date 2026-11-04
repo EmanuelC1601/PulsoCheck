@@ -13,13 +13,21 @@ import mx.edu.uttt.pulsocheck.domain.repository.HeartRateEpisodeSummaryRepositor
 import mx.edu.uttt.pulsocheck.domain.repository.HeartRateReadingRepository
 import mx.edu.uttt.pulsocheck.domain.model.EpisodeResponseSummary
 import mx.edu.uttt.pulsocheck.domain.repository.EpisodeResponseSummaryRepository
+import mx.edu.uttt.pulsocheck.domain.repository.MobileHistoryRepository
 
 /** Prepara lecturas y episodios recientes para la pantalla móvil. */
 class MobileHomeViewModel(
     readingRepository: HeartRateReadingRepository,
     episodeRepository: HeartRateEpisodeSummaryRepository,
     responseRepository: EpisodeResponseSummaryRepository,
+    private val historyRepository: MobileHistoryRepository,
 ) : ViewModel() {
+    /** Borra del teléfono las lecturas, episodios y respuestas guardadas. */
+    fun borrarHistorialCompleto() {
+        viewModelScope.launch {
+            historyRepository.borrarHistorialCompleto()
+        }
+    }
 
     private val _readings = MutableStateFlow<List<HeartRateReading>>(emptyList())
     val readings: StateFlow<List<HeartRateReading>> = _readings.asStateFlow()

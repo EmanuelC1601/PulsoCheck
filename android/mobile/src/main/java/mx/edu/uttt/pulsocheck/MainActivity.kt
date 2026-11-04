@@ -37,6 +37,17 @@ import mx.edu.uttt.pulsocheck.domain.model.HeartRateEpisodeSummary
 import mx.edu.uttt.pulsocheck.data.repository.RoomEpisodeResponseSummaryRepository
 import mx.edu.uttt.pulsocheck.domain.model.EpisodeResponseSummary
 import mx.edu.uttt.pulsocheck.domain.model.FeelingOption
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.Button
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.core.content.ContextCompat
+import java.time.LocalDate
+import mx.edu.uttt.pulsocheck.data.repository.RoomMobileHistoryRepository
 
 /** Punto de entrada de la aplicación para teléfono. */
 class MainActivity : ComponentActivity() {
@@ -55,11 +66,13 @@ class MainActivity : ComponentActivity() {
         val responseRepository = RoomEpisodeResponseSummaryRepository(
             database.episodeResponseSummaryDao(),
         )
+        val historyRepository = RoomMobileHistoryRepository(database)
 
         // El ViewModel observa los tres repositorios de la pantalla.
         val viewModel = ViewModelProvider(
             this,
             MobileHomeViewModelFactory(
+                historyRepository = historyRepository,
                 readingRepository = readingRepository,
                 episodeRepository = episodeRepository,
                 responseRepository = responseRepository,
@@ -70,10 +83,36 @@ class MainActivity : ComponentActivity() {
             val readings = viewModel.readings.collectAsState().value
             val episodes = viewModel.episodes.collectAsState().value
             val responses = viewModel.responses.collectAsState().value
+            val notificationPermissionGranted = remember {
+                mutableStateOf(
+                    Build.VERSION.SDK_INT < 33 ||
+                            ContextCompat.checkSelfPermission(
+                                this@MainActivity,
+                                Manifest.permission.POST_NOTIFICATIONS,
+                            ) == PackageManager.PERMISSION_GRANTED,
+                )
+            }
+
+
+            val notificationPermissionLauncher =
+                rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission(),
+                ) { granted ->
+                    notificationPermissionGranted.value = granted
+                }
 
             PulsoCheckTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     MobileHomeScreen(
+                        showNotificationPermissionButton =
+                            !notificationPermissionGranted.value,
+                        onRequestNotificationPermission = {
+                            if (Build.VERSION.SDK_INT >= 33) {
+                                notificationPermissionLauncher.launch(
+                                    Manifest.permission.POST_NOTIFICATIONS,
+                                )
+                            }
+                        },
                         readings = readings,
                         episodes = episodes,
                         responses = responses,
@@ -91,8 +130,33 @@ private fun MobileHomeScreen(
     readings: List<HeartRateReading>,
     episodes: List<HeartRateEpisodeSummary>,
     responses: List<EpisodeResponseSummary>,
+    showNotificationPermissionButton: Boolean,
+    onRequestNotificationPermission: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Calculamos el inicio y el final de cada día usando la zona horaria del teléfono.
+    val zoneId = ZoneId.systemDefault()
+    val today = LocalDate.now(zoneId)
+
+    val dailySummaries = (0L..4L).map { daysAgo ->
+        val date = today.minusDays(daysAgo)
+        val startOfDay = date.atStartOfDay(zoneId).toInstant().toEpochMilli()
+        val startOfNextDay = date.plusDays(1)
+            .atStartOfDay(zoneId)
+            .toInstant()
+            .toEpochMilli()
+
+        // Solo contamos lecturas cuya hora corresponde a ese día local.
+        val readingsForDay = readings.filter { reading ->
+            reading.measuredAtEpochMillis >= startOfDay &&
+                    reading.measuredAtEpochMillis < startOfNextDay
+        }
+
+        DailyReadingsSummary(
+            date = date,
+            readings = readingsForDay,
+        )
+    }
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -109,6 +173,14 @@ private fun MobileHomeScreen(
                 text = "Historial de los últimos cinco días",
                 style = MaterialTheme.typography.titleMedium,
             )
+        }
+
+        if (showNotificationPermissionButton) {
+            item {
+                Button(onClick = onRequestNotificationPermission) {
+                    Text("Activar avisos de episodios")
+                }
+            }
         }
 
         item {
@@ -134,6 +206,20 @@ private fun MobileHomeScreen(
                     },
                 )
             }
+        }
+
+        item {
+            Text(
+                text = "Resumen diario",
+                style = MaterialTheme.typography.titleLarge,
+            )
+        }
+
+        items(
+            items = dailySummaries,
+            key = { summary -> "day-${summary.date}" },
+        ) { summary ->
+            DailyReadingsCard(summary)
         }
 
         item {
@@ -211,6 +297,41 @@ private fun EpisodeCard(
                 Text(
                     "Respuesta: ${formatReadingTime(response.answeredAtEpochMillis)}",
                 )
+            }
+        }
+    }
+}
+/** Agrupa las lecturas que pertenecen a un mismo día local. */
+private data class DailyReadingsSummary(
+    val date: LocalDate,
+    val readings: List<HeartRateReading>,
+)
+
+/** Muestra el resumen del día sin rellenar los días vacíos con datos inventados. */
+@Composable
+private fun DailyReadingsCard(summary: DailyReadingsSummary) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = summary.date.format(
+                    DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.getDefault()),
+                ),
+                style = MaterialTheme.typography.titleMedium,
+            )
+
+            if (summary.readings.isEmpty()) {
+                Text("Sin datos")
+            } else {
+                val bpmValues = summary.readings.map { reading ->
+                    reading.beatsPerMinute
+                }
+                val averageBpm = bpmValues.average().toInt()
+                val minimumBpm = bpmValues.minOrNull()
+                val maximumBpm = bpmValues.maxOrNull()
+
+                Text("Lecturas disponibles: ${summary.readings.size}")
+                Text("Promedio disponible: $averageBpm lpm")
+                Text("Mínimo y máximo: $minimumBpm–$maximumBpm lpm")
             }
         }
     }

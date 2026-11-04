@@ -12,6 +12,7 @@ import mx.edu.uttt.pulsocheck.data.local.database.MobileDatabase
 import mx.edu.uttt.pulsocheck.data.repository.RoomHeartRateEpisodeSummaryRepository
 import mx.edu.uttt.pulsocheck.domain.model.EpisodeStatus
 import mx.edu.uttt.pulsocheck.domain.model.HeartRateEpisodeSummary
+import mx.edu.uttt.pulsocheck.data.notification.MobileEpisodeNotifier
 
 /**
  * Recibe resúmenes de episodios del reloj aunque la app del teléfono no esté abierta.
@@ -76,6 +77,7 @@ class HeartRateEpisodeDataLayerListenerService : WearableListenerService() {
 
             // Room se ejecuta en segundo plano y termina antes de liberar los eventos.
             runBlocking(Dispatchers.IO) {
+                val notifier = MobileEpisodeNotifier(applicationContext)
                 val database = MobileDatabase.obtenerInstancia(applicationContext)
                 val repository = RoomHeartRateEpisodeSummaryRepository(
                     database.heartRateEpisodeSummaryDao(),
@@ -90,6 +92,21 @@ class HeartRateEpisodeDataLayerListenerService : WearableListenerService() {
                 incomingEpisodes.forEach { (dataUri, episode) ->
                     if (episode.startedAtEpochMillis >= fiveDaysAgo) {
                         repository.guardar(episode)
+
+                        val endedAt = episode.endedAtEpochMillis
+                        val ageOfEpisode = endedAt?.let { endTime ->
+                            System.currentTimeMillis() - endTime
+                        }
+
+                        // Solo avisamos al cerrar un episodio y si terminó hace poco.
+                        if (
+                            episode.status == EpisodeStatus.CLOSED &&
+                            ageOfEpisode != null &&
+                            ageOfEpisode in 0..RECENT_EPISODE_MILLIS &&
+                            marcarEpisodioComoNotificado(episode.episodeId)
+                        ) {
+                            notifier.notificarEpisodio(episode)
+                        }
                     }
 
                     // Ya procesado el resumen, quitamos su elemento temporal del Data Layer.
@@ -112,7 +129,42 @@ class HeartRateEpisodeDataLayerListenerService : WearableListenerService() {
         }
     }
 
+    /**
+     * Recuerda los episodios avisados para no repetir la notificación
+     * si el reloj vuelve a sincronizar el mismo episodio.
+     */
+    private fun marcarEpisodioComoNotificado(episodeId: String): Boolean {
+        val preferences = getSharedPreferences(
+            NOTIFICATION_PREFERENCES,
+            MODE_PRIVATE,
+        )
+
+        val notifiedIds = preferences
+            .getStringSet(NOTIFIED_EPISODE_IDS, emptySet())
+            .orEmpty()
+            .toMutableSet()
+
+        if (!notifiedIds.add(episodeId)) {
+            return false
+        }
+
+        // Limitamos la lista para no guardar identificadores indefinidamente.
+        while (notifiedIds.size > MAX_NOTIFIED_EPISODES) {
+            notifiedIds.remove(notifiedIds.first())
+        }
+
+        preferences.edit()
+            .putStringSet(NOTIFIED_EPISODE_IDS, notifiedIds)
+            .apply()
+
+        return true
+    }
     private companion object {
+        const val NOTIFICATION_PREFERENCES = "pulsocheck_notification_preferences"
+        const val NOTIFIED_EPISODE_IDS = "notified_episode_ids"
+        const val MAX_NOTIFIED_EPISODES = 100
+        const val RECENT_EPISODE_MILLIS = 2 * 60 * 1000L
+
         const val TAG = "PulsoCheckSync"
         const val EPISODES_PATH = "/pulsocheck/episodes/"
 

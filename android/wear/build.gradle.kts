@@ -60,4 +60,5 @@ dependencies {
     // Health Services expone ListenableFuture en su API; se declara para que Kotlin pueda compilarla.
     implementation(libs.google.guava.listenablefuture)
     ksp(libs.androidx.room.compiler)
+    implementation(libs.androidx.core.ktx)
 }

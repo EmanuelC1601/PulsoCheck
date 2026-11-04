@@ -32,4 +32,8 @@ interface EpisodeResponseSummaryDao {
     suspend fun buscarPorEpisodio(
         episodeId: String,
     ): EpisodeResponseSummaryEntity?
+
+    /** Borra todas las respuestas guardadas localmente en el teléfono. */
+    @Query("DELETE FROM mobile_episode_responses")
+    suspend fun eliminarTodas()
 }

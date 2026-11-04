@@ -35,4 +35,7 @@ interface HeartRateEpisodeSummaryDao {
         """,
     )
     suspend fun eliminarAnterioresA(fechaLimite: Long)
+    /** Borra todos los episodios guardados localmente en el teléfono. */
+    @Query("DELETE FROM mobile_heart_rate_episodes")
+    suspend fun eliminarTodos()
 }

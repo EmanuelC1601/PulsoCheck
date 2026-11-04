@@ -48,6 +48,7 @@ androidx-room-runtime = { group = "androidx.room", name = "room-runtime", versio
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 androidx-health-services-client = { group = "androidx.health", name = "health-services-client", version.ref = "healthServices" }
 google-guava-listenablefuture = { group = "com.google.guava", name = "listenablefuture", version.ref = "listenableFuture" }
+androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

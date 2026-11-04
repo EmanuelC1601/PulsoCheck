@@ -28,4 +28,8 @@ interface HeartRateReadingDao {
     // La base móvil conserva solo el rango de historial acordado para el proyecto.
     @Query("DELETE FROM mobile_heart_rate_readings WHERE measured_at_epoch_millis < :cutoff")
     suspend fun eliminarAnterioresA(cutoff: Long)
+
+    /** Borra todas las lecturas guardadas localmente en el teléfono. */
+    @Query("DELETE FROM mobile_heart_rate_readings")
+    suspend fun eliminarTodas()
 }

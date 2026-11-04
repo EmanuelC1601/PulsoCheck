@@ -5,12 +5,14 @@ import androidx.lifecycle.ViewModelProvider
 import mx.edu.uttt.pulsocheck.domain.repository.HeartRateEpisodeSummaryRepository
 import mx.edu.uttt.pulsocheck.domain.repository.HeartRateReadingRepository
 import mx.edu.uttt.pulsocheck.domain.repository.EpisodeResponseSummaryRepository
+import mx.edu.uttt.pulsocheck.domain.repository.MobileHistoryRepository
 
 /** Construye el ViewModel con los repositorios de lecturas y episodios. */
 class MobileHomeViewModelFactory(
     private val readingRepository: HeartRateReadingRepository,
     private val episodeRepository: HeartRateEpisodeSummaryRepository,
     private val responseRepository: EpisodeResponseSummaryRepository,
+    private val historyRepository: MobileHistoryRepository,
 ) : ViewModelProvider.Factory {
 
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -23,6 +25,7 @@ class MobileHomeViewModelFactory(
             readingRepository = readingRepository,
             episodeRepository = episodeRepository,
             responseRepository = responseRepository,
+            historyRepository = historyRepository,
         ) as T
     }
 }

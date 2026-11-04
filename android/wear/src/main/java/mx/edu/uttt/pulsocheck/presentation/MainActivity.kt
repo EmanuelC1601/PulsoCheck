@@ -30,6 +30,7 @@ import androidx.wear.compose.ui.tooling.preview.WearPreviewDevices
 import androidx.wear.compose.ui.tooling.preview.WearPreviewFontScales
 import mx.edu.uttt.pulsocheck.R
 import mx.edu.uttt.pulsocheck.data.local.database.PulsoCheckDatabase
+import mx.edu.uttt.pulsocheck.data.notification.HeartRateEpisodeNotifier
 import mx.edu.uttt.pulsocheck.data.repository.RoomEpisodeResponseRepository
 import mx.edu.uttt.pulsocheck.data.repository.RoomHeartRateEpisodeRepository
 import mx.edu.uttt.pulsocheck.data.repository.RoomHeartRateReadingRepository
@@ -61,12 +62,14 @@ class MainActivity : ComponentActivity() {
         )
         val heartRateDataSource = HealthServicesHeartRateDataSource(applicationContext)
         val dataLayerSender = HeartRateDataLayerSender(applicationContext)
+        val episodeNotifier = HeartRateEpisodeNotifier(applicationContext)
         val viewModelFactory = TrackingViewModelFactory(
             readingRepository = readingRepository,
             episodeRepository = episodeRepository,
             responseRepository = responseRepository,
             heartRateDataSource = heartRateDataSource,
             dataLayerSender = dataLayerSender,
+            episodeNotifier = episodeNotifier,
         )
 
         // ViewModelProvider conserva el ViewModel durante cambios de configuración.
@@ -119,6 +122,27 @@ fun WearApp(trackingViewModel: TrackingViewModel) {
         }
     }
 
+    // Inicia el seguimiento o solicita primero el permiso del sensor.
+    val iniciarConPermisoDelSensor: () -> Unit = {
+        val permisoDePulsoConcedido = ContextCompat.checkSelfPermission(
+            context,
+            heartRatePermission,
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (permisoDePulsoConcedido) {
+            trackingViewModel.iniciarSeguimiento()
+        } else {
+            permissionLauncher.launch(heartRatePermission)
+        }
+    }
+
+    // Aunque se deniegue este permiso, aún se permite solicitar el del sensor.
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { _ ->
+        iniciarConPermisoDelSensor()
+    }
+
     PulsoCheckTheme {
         WearHomeScreen(
             episodes = episodes,
@@ -126,15 +150,19 @@ fun WearApp(trackingViewModel: TrackingViewModel) {
             readings = readings,
             trackingStatus = trackingStatus,
             onStart = {
-                val permissionGranted = ContextCompat.checkSelfPermission(
-                    context,
-                    heartRatePermission,
-                ) == PackageManager.PERMISSION_GRANTED
+                val notificationsGranted =
+                    Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                        ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.POST_NOTIFICATIONS,
+                        ) == PackageManager.PERMISSION_GRANTED
 
-                if (permissionGranted) {
-                    trackingViewModel.iniciarSeguimiento()
+                if (notificationsGranted) {
+                    iniciarConPermisoDelSensor()
                 } else {
-                    permissionLauncher.launch(heartRatePermission)
+                    notificationPermissionLauncher.launch(
+                        Manifest.permission.POST_NOTIFICATIONS,
+                    )
                 }
             },
             onStop = trackingViewModel::detenerSeguimiento,

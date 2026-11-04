@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import mx.edu.uttt.pulsocheck.data.notification.HeartRateEpisodeNotifier
 import mx.edu.uttt.pulsocheck.data.sensor.HealthServicesHeartRateDataSource
 import mx.edu.uttt.pulsocheck.data.sync.HeartRateDataLayerSender
 import mx.edu.uttt.pulsocheck.domain.config.HeartRateMonitoringConfig
@@ -45,6 +46,7 @@ class TrackingViewModel(
     private val responseRepository: EpisodeResponseRepository,
     private val heartRateDataSource: HealthServicesHeartRateDataSource,
     private val dataLayerSender: HeartRateDataLayerSender,
+    private val episodeNotifier: HeartRateEpisodeNotifier,
     private val monitoringConfig: HeartRateMonitoringConfig =
         HeartRateMonitoringConfig(),
     private val detectEpisodes: DetectHeartRateEpisodesUseCase =
@@ -60,6 +62,9 @@ class TrackingViewModel(
     // Recuerda qué versión de cada episodio ya aceptó enviar Data Layer.
     private val episodiosEnviados = mutableMapOf<String, HeartRateEpisode>()
     val episodios: StateFlow<List<HeartRateEpisode>> = _episodios.asStateFlow()
+
+    // Evita avisos al cargar episodios que ya existían antes de abrir la app.
+    private var primeraCargaDeEpisodios = true
 
     // La pantalla muestra la pregunta solo para episodios cerrados sin respuesta.
     private val _episodioPendienteDeRespuesta = MutableStateFlow<HeartRateEpisode?>(null)
@@ -81,7 +86,30 @@ class TrackingViewModel(
         // Room emite los episodios guardados cada vez que la tabla cambia.
         viewModelScope.launch {
             episodeRepository.observarTodos().collect { episodiosGuardados ->
+                // Tomamos una foto de los IDs antes de actualizar el estado.
+                val idsAnteriores = _episodios.value.mapTo(mutableSetOf()) { episodio ->
+                    episodio.id
+                }
+
                 _episodios.value = episodiosGuardados
+
+                // La primera emisión de Room puede contener episodios históricos.
+                if (!primeraCargaDeEpisodios) {
+                    val ahora = System.currentTimeMillis()
+
+                    episodiosGuardados
+                        .filter { episodio ->
+                            val antiguedad = ahora - episodio.startedAtEpochMillis
+
+                            episodio.id !in idsAnteriores &&
+                                antiguedad in 0..VENTANA_NOTIFICACION_MILLIS
+                        }
+                        .forEach { episodioNuevo ->
+                            episodeNotifier.notificarEpisodio(episodioNuevo)
+                        }
+                }
+
+                primeraCargaDeEpisodios = false
 
                 // Al iniciar, también se envían los episodios que ya estaban guardados.
                 // Después, solo enviamos los que cambiaron, como un episodio activo.
@@ -212,5 +240,10 @@ class TrackingViewModel(
     /** Actualiza el estado si la persona rechaza el permiso del sensor. */
     fun indicarPermisoRequerido() {
         _estadoSeguimiento.value = TrackingStatus.PERMISSION_REQUIRED
+    }
+
+    private companion object {
+        // Los episodios atrasados se conservan en el historial, sin avisos tardíos.
+        const val VENTANA_NOTIFICACION_MILLIS = 2 * 60 * 1000L
     }
 }
