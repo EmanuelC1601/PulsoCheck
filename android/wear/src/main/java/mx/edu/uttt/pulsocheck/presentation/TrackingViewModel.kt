@@ -57,6 +57,8 @@ class TrackingViewModel(
 
     // Los episodios se calculan a partir de las lecturas guardadas.
     private val _episodios = MutableStateFlow<List<HeartRateEpisode>>(emptyList())
+    // Recuerda qué versión de cada episodio ya aceptó enviar Data Layer.
+    private val episodiosEnviados = mutableMapOf<String, HeartRateEpisode>()
     val episodios: StateFlow<List<HeartRateEpisode>> = _episodios.asStateFlow()
 
     // La pantalla muestra la pregunta solo para episodios cerrados sin respuesta.
@@ -80,8 +82,20 @@ class TrackingViewModel(
         viewModelScope.launch {
             episodeRepository.observarTodos().collect { episodiosGuardados ->
                 _episodios.value = episodiosGuardados
+
+                // Al iniciar, también se envían los episodios que ya estaban guardados.
+                // Después, solo enviamos los que cambiaron, como un episodio activo.
+                episodiosGuardados.forEach { episodio ->
+                    if (episodiosEnviados[episodio.id] != episodio) {
+                        dataLayerSender.enviarEpisodio(episodio) {
+                            episodiosEnviados[episodio.id] = episodio
+                        }
+                    }
+                }
+
                 actualizarEpisodioPendiente()
             }
+
         }
 
         // Las respuestas guardadas ocultan la pregunta correspondiente.
@@ -167,13 +181,18 @@ class TrackingViewModel(
         val episodio = _episodioPendienteDeRespuesta.value ?: return
 
         viewModelScope.launch {
-            responseRepository.guardar(
-                EpisodeResponse(
-                    episodeId = episodio.id,
-                    feeling = feeling,
-                    answeredAtEpochMillis = System.currentTimeMillis(),
-                ),
+            // Creamos una sola respuesta para guardar y enviar el mismo dato.
+            val respuesta = EpisodeResponse(
+                episodeId = episodio.id,
+                feeling = feeling,
+                answeredAtEpochMillis = System.currentTimeMillis(),
             )
+
+            // Conservamos una copia local aunque el teléfono no esté conectado.
+            responseRepository.guardar(respuesta)
+
+            // El emisor sincroniza el dato cuando el teléfono esté disponible.
+            dataLayerSender.enviarRespuesta(respuesta)
         }
     }
 

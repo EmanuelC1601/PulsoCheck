@@ -2,8 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Las lecturas de salud permanecen en el dispositivo y no entran en copias cloud. -->
     <application
-        <!-- Las lecturas de salud permanecen en el dispositivo y no entran en copias cloud. -->
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -34,6 +34,31 @@
                 <data
                     android:host="*"
                     android:pathPrefix="/pulsocheck/readings"
+                    android:scheme="wear" />
+            </intent-filter>
+        </service>
+        <!-- Recibe los resúmenes de episodios enviados por el reloj. -->
+        <service
+            android:name=".data.sync.HeartRateEpisodeDataLayerListenerService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/pulsocheck/episodes"
+                    android:scheme="wear" />
+            </intent-filter>
+        </service>
+
+        <!-- Recibe las respuestas que la persona registra en el reloj. -->
+        <service
+            android:name=".data.sync.EpisodeResponseDataLayerListenerService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/pulsocheck/responses"
                     android:scheme="wear" />
             </intent-filter>
         </service>

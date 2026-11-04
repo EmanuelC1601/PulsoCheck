@@ -31,6 +31,12 @@ import mx.edu.uttt.pulsocheck.domain.model.HeartRateReading
 import mx.edu.uttt.pulsocheck.presentation.MobileHomeViewModel
 import mx.edu.uttt.pulsocheck.presentation.MobileHomeViewModelFactory
 import mx.edu.uttt.pulsocheck.ui.theme.PulsoCheckTheme
+import mx.edu.uttt.pulsocheck.data.repository.RoomHeartRateEpisodeSummaryRepository
+import mx.edu.uttt.pulsocheck.domain.model.EpisodeStatus
+import mx.edu.uttt.pulsocheck.domain.model.HeartRateEpisodeSummary
+import mx.edu.uttt.pulsocheck.data.repository.RoomEpisodeResponseSummaryRepository
+import mx.edu.uttt.pulsocheck.domain.model.EpisodeResponseSummary
+import mx.edu.uttt.pulsocheck.domain.model.FeelingOption
 
 /** Punto de entrada de la aplicación para teléfono. */
 class MainActivity : ComponentActivity() {
@@ -39,21 +45,38 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Construye Room y el repositorio que abastece el historial.
+        // Room guarda las lecturas y los episodios en tablas separadas.
         val database = MobileDatabase.obtenerInstancia(applicationContext)
-        val repository = RoomHeartRateReadingRepository(database.heartRateReadingDao())
+        val readingRepository =
+            RoomHeartRateReadingRepository(database.heartRateReadingDao())
+        val episodeRepository = RoomHeartRateEpisodeSummaryRepository(
+            database.heartRateEpisodeSummaryDao(),
+        )
+        val responseRepository = RoomEpisodeResponseSummaryRepository(
+            database.episodeResponseSummaryDao(),
+        )
+
+        // El ViewModel observa los tres repositorios de la pantalla.
         val viewModel = ViewModelProvider(
             this,
-            MobileHomeViewModelFactory(repository),
+            MobileHomeViewModelFactory(
+                readingRepository = readingRepository,
+                episodeRepository = episodeRepository,
+                responseRepository = responseRepository,
+            ),
         )[MobileHomeViewModel::class.java]
 
         setContent {
             val readings = viewModel.readings.collectAsState().value
+            val episodes = viewModel.episodes.collectAsState().value
+            val responses = viewModel.responses.collectAsState().value
 
             PulsoCheckTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     MobileHomeScreen(
                         readings = readings,
+                        episodes = episodes,
+                        responses = responses,
                         modifier = Modifier.padding(innerPadding),
                     )
                 }
@@ -62,47 +85,74 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** Historial sencillo de las lecturas que el reloj sincronizó al teléfono. */
+/** Muestra episodios y lecturas recibidos del reloj. */
 @Composable
 private fun MobileHomeScreen(
     readings: List<HeartRateReading>,
+    episodes: List<HeartRateEpisodeSummary>,
+    responses: List<EpisodeResponseSummary>,
     modifier: Modifier = Modifier,
 ) {
-    Column(
+    LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .padding(horizontal = 20.dp),
+        contentPadding = PaddingValues(vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
-            text = "PulsoCheck",
-            style = MaterialTheme.typography.headlineMedium,
-        )
-        Text(
-            text = "Historial de frecuencia cardiaca",
-            style = MaterialTheme.typography.titleMedium,
-        )
-        Text(
-            text = "Lecturas recibidas en los últimos cinco días: ${readings.size}",
-            modifier = Modifier.padding(top = 8.dp, bottom = 16.dp),
-        )
+        item {
+            Text(
+                text = "PulsoCheck",
+                style = MaterialTheme.typography.headlineMedium,
+            )
+            Text(
+                text = "Historial de los últimos cinco días",
+                style = MaterialTheme.typography.titleMedium,
+            )
+        }
+
+        item {
+            Text(
+                text = "Episodios (${episodes.size})",
+                style = MaterialTheme.typography.titleLarge,
+            )
+        }
+
+        if (episodes.isEmpty()) {
+            item {
+                Text("Aún no se han recibido episodios del reloj.")
+            }
+        } else {
+            items(
+                items = episodes,
+                key = { episode -> "episode-${episode.episodeId}" },
+            ) { episode ->
+                EpisodeCard(
+                    episode = episode,
+                    response = responses.firstOrNull { response ->
+                        response.episodeId == episode.episodeId
+                    },
+                )
+            }
+        }
+
+        item {
+            Text(
+                text = "Lecturas (${readings.size})",
+                style = MaterialTheme.typography.titleLarge,
+            )
+        }
 
         if (readings.isEmpty()) {
-            Text(
-                text = "Aún no hay lecturas. Cuando el reloj sincronice datos, aparecerán aquí.",
-                style = MaterialTheme.typography.bodyLarge,
-            )
+            item {
+                Text("Aún no hay lecturas recibidas del reloj.")
+            }
         } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(
-                    items = readings,
-                    key = { reading -> reading.id },
-                ) { reading ->
-                    ReadingCard(reading)
-                }
+            items(
+                items = readings,
+                key = { reading -> "reading-${reading.id}" },
+            ) { reading ->
+                ReadingCard(reading)
             }
         }
     }
@@ -121,6 +171,47 @@ private fun ReadingCard(reading: HeartRateReading) {
                 text = formatReadingTime(reading.measuredAtEpochMillis),
                 style = MaterialTheme.typography.bodyMedium,
             )
+        }
+    }
+}
+/** Presenta un resumen; no lo interpreta como diagnóstico. */
+@Composable
+private fun EpisodeCard(
+    episode: HeartRateEpisodeSummary,
+    response: EpisodeResponseSummary?,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = if (episode.status == EpisodeStatus.ACTIVE) {
+                    "Episodio activo"
+                } else {
+                    "Episodio cerrado"
+                },
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Text("${episode.readingCount} lecturas")
+            Text("Inicio: ${formatReadingTime(episode.startedAtEpochMillis)}")
+
+            episode.endedAtEpochMillis?.let { endedAt ->
+                Text("Fin: ${formatReadingTime(endedAt)}")
+            }
+
+            // La respuesta es opcional: quizá la persona aún no la registró.
+            if (response == null) {
+                Text("Sin respuesta registrada")
+            } else {
+                val feelingText = when (response.feeling) {
+                    FeelingOption.GOOD -> "Bien"
+                    FeelingOption.OKAY -> "Regular"
+                    FeelingOption.BAD -> "Mal"
+                }
+
+                Text("Cómo se sintió: $feelingText")
+                Text(
+                    "Respuesta: ${formatReadingTime(response.answeredAtEpochMillis)}",
+                )
+            }
         }
     }
 }

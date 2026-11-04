@@ -2,11 +2,15 @@ package mx.edu.uttt.pulsocheck.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import mx.edu.uttt.pulsocheck.domain.repository.HeartRateEpisodeSummaryRepository
 import mx.edu.uttt.pulsocheck.domain.repository.HeartRateReadingRepository
+import mx.edu.uttt.pulsocheck.domain.repository.EpisodeResponseSummaryRepository
 
-/** Construye MobileHomeViewModel con el repositorio de Room. */
+/** Construye el ViewModel con los repositorios de lecturas y episodios. */
 class MobileHomeViewModelFactory(
-    private val repository: HeartRateReadingRepository,
+    private val readingRepository: HeartRateReadingRepository,
+    private val episodeRepository: HeartRateEpisodeSummaryRepository,
+    private val responseRepository: EpisodeResponseSummaryRepository,
 ) : ViewModelProvider.Factory {
 
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -15,6 +19,10 @@ class MobileHomeViewModelFactory(
         }
 
         @Suppress("UNCHECKED_CAST")
-        return MobileHomeViewModel(repository) as T
+        return MobileHomeViewModel(
+            readingRepository = readingRepository,
+            episodeRepository = episodeRepository,
+            responseRepository = responseRepository,
+        ) as T
     }
 }
