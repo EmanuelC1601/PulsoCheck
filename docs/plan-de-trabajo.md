@@ -2,6 +2,22 @@
 
 Este plan convierte la propuesta inicial en entregas pequeñas que se puedan revisar y explicar.
 
+## Estado al 9 de noviembre de 2026
+
+La implementación principal está en el repositorio. Aún no se debe marcar el proyecto como terminado hasta compilar los cambios finales y ejecutar la lista de pruebas en un reloj Wear OS y un teléfono compatibles.
+
+| Hito | Estado |
+|---|---|
+| Estructura Wear + teléfono y pantallas iniciales | Implementado |
+| Room, entidades, DAO y repositorios | Implementado en ambos módulos |
+| Detección de episodios y respuesta desde el reloj | Implementado en código; requiere validación física |
+| Health Services y permiso de frecuencia cardiaca | Integración implementada con MeasureClient; pruebas físicas pendientes |
+| Sincronización de lecturas, episodios y respuestas | Integrada con Data Layer; verificación de desconexión/reconexión pendiente |
+| Historial telefónico, resumen diario y borrado local confirmado | Implementado; falta compilar los cambios más recientes |
+| Notificaciones de episodio | Integradas en ambos módulos; dependen de permisos y ajustes del dispositivo |
+| Complemento de propuesta actualizado | Documento Markdown y PDF actualizados |
+| Compilación final y pruebas completas en dispositivos | Pendiente |
+
 ## Decisiones base de la propuesta
 
 - Dos módulos Android: `wear` para Wear OS y `mobile` para el teléfono.

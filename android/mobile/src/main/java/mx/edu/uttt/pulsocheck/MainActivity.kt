@@ -13,9 +13,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
@@ -83,6 +85,8 @@ class MainActivity : ComponentActivity() {
             val readings = viewModel.readings.collectAsState().value
             val episodes = viewModel.episodes.collectAsState().value
             val responses = viewModel.responses.collectAsState().value
+            val borrandoHistorial = viewModel.borrandoHistorial.collectAsState().value
+            val mensajeHistorial = viewModel.mensajeHistorial.collectAsState().value
             val notificationPermissionGranted = remember {
                 mutableStateOf(
                     Build.VERSION.SDK_INT < 33 ||
@@ -116,6 +120,9 @@ class MainActivity : ComponentActivity() {
                         readings = readings,
                         episodes = episodes,
                         responses = responses,
+                        borrandoHistorial = borrandoHistorial,
+                        mensajeHistorial = mensajeHistorial,
+                        onBorrarHistorial = viewModel::borrarHistorialCompleto,
                         modifier = Modifier.padding(innerPadding),
                     )
                 }
@@ -132,8 +139,14 @@ private fun MobileHomeScreen(
     responses: List<EpisodeResponseSummary>,
     showNotificationPermissionButton: Boolean,
     onRequestNotificationPermission: () -> Unit,
+    borrandoHistorial: Boolean,
+    mensajeHistorial: String?,
+    onBorrarHistorial: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // La eliminación requiere confirmación para evitar toques accidentales.
+    val mostrarConfirmacionBorrado = remember { mutableStateOf(false) }
+
     // Calculamos el inicio y el final de cada día usando la zona horaria del teléfono.
     val zoneId = ZoneId.systemDefault()
     val today = LocalDate.now(zoneId)
@@ -241,6 +254,55 @@ private fun MobileHomeScreen(
                 ReadingCard(reading)
             }
         }
+
+        item {
+            Text(
+                text = "Este borrado afecta solo a la copia de este teléfono; el reloj conserva sus datos.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Button(
+                onClick = { mostrarConfirmacionBorrado.value = true },
+                enabled = !borrandoHistorial,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (borrandoHistorial) "Borrando historial…" else "Borrar historial del teléfono")
+            }
+            mensajeHistorial?.let { mensaje ->
+                Text(
+                    text = mensaje,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+    }
+
+    if (mostrarConfirmacionBorrado.value) {
+        AlertDialog(
+            onDismissRequest = { mostrarConfirmacionBorrado.value = false },
+            title = { Text("¿Borrar el historial del teléfono?") },
+            text = {
+                Text("Se eliminarán las lecturas, episodios y respuestas guardados en este teléfono. El reloj conservará su copia.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        mostrarConfirmacionBorrado.value = false
+                        onBorrarHistorial()
+                    },
+                    enabled = !borrandoHistorial,
+                ) {
+                    Text("Borrar")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { mostrarConfirmacionBorrado.value = false },
+                    enabled = !borrandoHistorial,
+                ) {
+                    Text("Cancelar")
+                }
+            },
+        )
     }
 }
 
