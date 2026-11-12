@@ -82,6 +82,9 @@ class TrackingViewModel(
     // Guardamos la tarea para poder cancelar la lectura cuando se detenga.
     private var tareaDeLectura: Job? = null
 
+    // La primera emisión de Room contiene el historial que ya estaba en el reloj.
+    private var primeraCargaDeLecturas = true
+
     init {
         // Room emite los episodios guardados cada vez que la tabla cambia.
         viewModelScope.launch {
@@ -138,6 +141,21 @@ class TrackingViewModel(
         viewModelScope.launch {
             readingRepository.observarTodas().collect { lecturasGuardadas ->
                 _lecturas.value = lecturasGuardadas
+
+                if (primeraCargaDeLecturas) {
+                    primeraCargaDeLecturas = false
+
+                    // Recupera lecturas guardadas antes de emparejar el teléfono
+                    // o instalar PulsoCheck en él. El teléfono conserva cinco días.
+                    val fechaLimite = System.currentTimeMillis() -
+                        VENTANA_HISTORIAL_SINCRONIZADO_MILLIS
+                    lecturasGuardadas
+                        .asSequence()
+                        .filter { lectura ->
+                            lectura.measuredAtEpochMillis >= fechaLimite
+                        }
+                        .forEach(dataLayerSender::enviar)
+                }
 
                 // Aplicamos la regla del dominio usando los parámetros configurados.
                 val episodiosDetectados = detectEpisodes(
@@ -245,5 +263,9 @@ class TrackingViewModel(
     private companion object {
         // Los episodios atrasados se conservan en el historial, sin avisos tardíos.
         const val VENTANA_NOTIFICACION_MILLIS = 2 * 60 * 1000L
+
+        // Debe coincidir con la ventana de historial que conserva la app móvil.
+        const val VENTANA_HISTORIAL_SINCRONIZADO_MILLIS =
+            5 * 24 * 60 * 60 * 1000L
     }
 }
