@@ -1,51 +1,58 @@
 package mx.edu.uttt.pulsocheck.ui.theme
 
-import android.app.Activity
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = BrandTealLight,
+    onPrimary = BrandNavy,
+    secondary = Color(0xFFA3CCC4),
+    onSecondary = BrandNavy,
+    tertiary = Color(0xFFFFB4AB),
+    onTertiary = Color(0xFF690005),
+    background = BrandDarkBackground,
+    onBackground = BrandDarkOnSurface,
+    surface = BrandDarkSurface,
+    onSurface = BrandDarkOnSurface,
+    surfaceVariant = BrandDarkSurfaceVariant,
+    onSurfaceVariant = BrandDarkOnSurfaceVariant,
+    outlineVariant = Color(0xFF44534F),
+    secondaryContainer = Color(0xFF28423E),
+    onSecondaryContainer = Color(0xFFCDE9E2),
+    error = Color(0xFFFFB4AB),
+    onError = Color(0xFF690005),
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    primary = BrandTeal,
+    onPrimary = BrandWhite,
+    secondary = Color(0xFF406A65),
+    onSecondary = BrandWhite,
+    tertiary = BrandCoral,
+    onTertiary = BrandWhite,
+    background = BrandBackground,
+    onBackground = BrandNavy,
+    surface = BrandWhite,
+    onSurface = BrandNavy,
+    surfaceVariant = BrandSurfaceVariant,
+    onSurfaceVariant = BrandOnSurfaceVariant,
+    outlineVariant = BrandOutlineVariant,
+    secondaryContainer = Color(0xFFDCEFEA),
+    onSecondaryContainer = Color(0xFF153E3A),
+    error = Color(0xFFB3261E),
+    onError = BrandWhite,
 )
 
 @Composable
 fun PulsoCheckTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }
