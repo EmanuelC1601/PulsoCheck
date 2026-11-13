@@ -60,12 +60,14 @@ class HeartRateEpisodeNotifier(context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
+        val isDemo = episodio.id.startsWith("demo-episode-")
         val notification = NotificationCompat.Builder(appContext, CHANNEL_ID)
             // Icono del sistema para no agregar recursos gráficos todavía.
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("Revisa PulsoCheck")
+            .setContentTitle(if (isDemo) "PulsoCheck · prueba DEMO" else "Revisa PulsoCheck")
             .setContentText(
-                "Se registró un episodio reciente. Consulta el reloj y registra cómo te sientes.",
+                if (isDemo) "Evento simulado creado para validar la aplicación."
+                else "Se registró un episodio reciente. Consulta el reloj y registra cómo te sientes.",
             )
             .setStyle(
                 NotificationCompat.BigTextStyle().bigText(

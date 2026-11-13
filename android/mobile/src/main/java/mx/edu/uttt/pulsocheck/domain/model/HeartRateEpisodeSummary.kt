@@ -11,6 +11,10 @@ data class HeartRateEpisodeSummary(
     val readingCount: Int,
     val status: EpisodeStatus,
 ) {
+    // Permite mostrar claramente los episodios creados por el botón de prueba.
+    val isDemo: Boolean
+        get() = episodeId.startsWith(DEMO_EPISODE_PREFIX)
+
     init {
         require(episodeId.isNotBlank()) {
             "El episodio necesita un identificador."
@@ -27,6 +31,10 @@ data class HeartRateEpisodeSummary(
         require(status != EpisodeStatus.ACTIVE || endedAtEpochMillis == null) {
             "Un episodio activo no puede tener fecha de cierre."
         }
+    }
+
+    private companion object {
+        const val DEMO_EPISODE_PREFIX = "demo-episode-"
     }
 }
 

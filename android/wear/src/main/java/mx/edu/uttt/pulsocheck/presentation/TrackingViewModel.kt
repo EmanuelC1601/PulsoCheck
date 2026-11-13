@@ -85,6 +85,12 @@ class TrackingViewModel(
     // La primera emisión de Room contiene el historial que ya estaba en el reloj.
     private var primeraCargaDeLecturas = true
 
+    // Estados de interfaz para que la persona sepa cuándo termina la prueba.
+    private val _demoEnCurso = MutableStateFlow(false)
+    val demoEnCurso: StateFlow<Boolean> = _demoEnCurso.asStateFlow()
+    private val _mensajeDemo = MutableStateFlow<String?>(null)
+    val mensajeDemo: StateFlow<String?> = _mensajeDemo.asStateFlow()
+
     init {
         // Room emite los episodios guardados cada vez que la tabla cambia.
         viewModelScope.launch {
@@ -215,6 +221,62 @@ class TrackingViewModel(
         }
     }
 
+    /**
+     * Crea cuatro lecturas simuladas y un episodio cerrado para comprobar
+     * notificaciones, almacenamiento y sincronización sin cambiar el sensor.
+     */
+    fun lanzarEpisodioDemo() {
+        // Evita crear varios episodios si se pulsa repetidamente.
+        if (_demoEnCurso.value) return
+
+        viewModelScope.launch {
+            _demoEnCurso.value = true
+            _mensajeDemo.value = null
+
+            try {
+                val demoId = UUID.randomUUID().toString()
+                val primerInstante = System.currentTimeMillis() -
+                    (DEMO_BPM_VALUES.lastIndex * DEMO_READING_INTERVAL_MILLIS)
+
+                // Estos valores se etiquetan como DEMO y nunca pasan por el sensor.
+                val demoReadings = DEMO_BPM_VALUES.mapIndexed { index, bpm ->
+                    HeartRateReading(
+                        id = "$DEMO_READING_ID_PREFIX$demoId-$index",
+                        beatsPerMinute = bpm,
+                        measuredAtEpochMillis = primerInstante +
+                            (index * DEMO_READING_INTERVAL_MILLIS),
+                        origin = ReadingOrigin.DEMO_TEST,
+                    )
+                }
+
+                // Guardar primero permite conservar el evento si no hay conexión.
+                demoReadings.forEach { reading ->
+                    readingRepository.guardar(reading)
+                    dataLayerSender.enviar(reading)
+                }
+
+                val demoEpisode = HeartRateEpisode(
+                    id = "$DEMO_EPISODE_ID_PREFIX$demoId",
+                    startedAtEpochMillis = demoReadings.first().measuredAtEpochMillis,
+                    endedAtEpochMillis = demoReadings.last().measuredAtEpochMillis,
+                    readingIds = demoReadings.map { reading -> reading.id },
+                    status = EpisodeStatus.CLOSED,
+                )
+
+                // El flujo de episodios mostrará y enviará este evento al teléfono.
+                episodeRepository.guardar(demoEpisode)
+                _mensajeDemo.value =
+                    "Prueba DEMO creada con 71–74 lpm. Revisa el teléfono."
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _mensajeDemo.value = "No se pudo crear la prueba DEMO. Intenta de nuevo."
+            } finally {
+                _demoEnCurso.value = false
+            }
+        }
+    }
+
     /** Cancela la escucha activa y libera el sensor. */
     fun detenerSeguimiento() {
         tareaDeLectura?.cancel()
@@ -250,7 +312,9 @@ class TrackingViewModel(
 
         _episodioPendienteDeRespuesta.value = _episodios.value
             .filter { episodio ->
-                episodio.status == EpisodeStatus.CLOSED && episodio.id !in idsConRespuesta
+                episodio.status == EpisodeStatus.CLOSED &&
+                    !episodio.id.startsWith(DEMO_EPISODE_ID_PREFIX) &&
+                    episodio.id !in idsConRespuesta
             }
             .maxByOrNull { episodio -> episodio.startedAtEpochMillis }
     }
@@ -267,5 +331,11 @@ class TrackingViewModel(
         // Debe coincidir con la ventana de historial que conserva la app móvil.
         const val VENTANA_HISTORIAL_SINCRONIZADO_MILLIS =
             5 * 24 * 60 * 60 * 1000L
+
+        // Los prefijos permiten reconocer la prueba en el teléfono sin mezcla visual.
+        const val DEMO_READING_ID_PREFIX = "demo-reading-"
+        const val DEMO_EPISODE_ID_PREFIX = "demo-episode-"
+        val DEMO_BPM_VALUES = listOf(71, 72, 73, 74)
+        const val DEMO_READING_INTERVAL_MILLIS = 1_000L
     }
 }

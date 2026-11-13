@@ -55,8 +55,14 @@ class MobileEpisodeNotifier(context: Context) {
 
         val notification = NotificationCompat.Builder(appContext, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("PulsoCheck registró un episodio")
-            .setContentText("Abre la aplicación para revisar el registro del reloj.")
+            .setContentTitle(
+                if (episodio.isDemo) "PulsoCheck · prueba DEMO"
+                else "PulsoCheck registró un episodio",
+            )
+            .setContentText(
+                if (episodio.isDemo) "Evento simulado recibido del reloj. Abre PulsoCheck para revisarlo."
+                else "Abre la aplicación para revisar el registro del reloj.",
+            )
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .setOnlyAlertOnce(true)

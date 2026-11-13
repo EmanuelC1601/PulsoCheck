@@ -182,7 +182,8 @@ private fun MobileHomeScreen(
 
         // Solo contamos lecturas cuya hora corresponde a ese día local.
         val readingsForDay = readings.filter { reading ->
-            reading.measuredAtEpochMillis >= startOfDay &&
+            !reading.isDemo &&
+                    reading.measuredAtEpochMillis >= startOfDay &&
                     reading.measuredAtEpochMillis < startOfNextDay
         }
 
@@ -199,6 +200,8 @@ private fun MobileHomeScreen(
         ?.average()
         ?.toInt()
     val latestReading = readings.firstOrNull()
+    val demoReadingsCount = readings.count { reading -> reading.isDemo }
+    val realReadingsCount = readings.size - demoReadingsCount
 
     LazyColumn(
         modifier = modifier
@@ -288,7 +291,11 @@ private fun MobileHomeScreen(
         item {
             SectionHeading(
                 title = "Lecturas recientes",
-                subtitle = "${readings.size} lecturas recibidas del reloj",
+                subtitle = if (demoReadingsCount == 0) {
+                    "$realReadingsCount lecturas recibidas del reloj"
+                } else {
+                    "$realReadingsCount reales · $demoReadingsCount simuladas DEMO"
+                },
             )
         }
 
@@ -472,7 +479,11 @@ private fun TodayHeroCard(
             )
             latestReading?.let { reading ->
                 Text(
-                    text = "Última lectura: ${reading.beatsPerMinute} lpm · ${formatReadingTime(reading.measuredAtEpochMillis)}",
+                    text = if (reading.isDemo) {
+                        "Última lectura DEMO simulada: ${reading.beatsPerMinute} lpm · ${formatReadingTime(reading.measuredAtEpochMillis)}"
+                    } else {
+                        "Última lectura: ${reading.beatsPerMinute} lpm · ${formatReadingTime(reading.measuredAtEpochMillis)}"
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.78f),
                 )
@@ -637,6 +648,19 @@ private fun ReadingCard(reading: HeartRateReading) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            if (reading.isDemo) {
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                ) {
+                    Text(
+                        text = "DEMO",
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                }
+            }
         }
     }
 }
@@ -667,7 +691,11 @@ private fun EpisodeCard(
                 )
                 Spacer(modifier = Modifier.width(9.dp))
                 Text(
-                    text = if (isActive) "Episodio activo" else "Episodio cerrado",
+                    text = when {
+                        episode.isDemo -> "Episodio de prueba · DEMO"
+                        isActive -> "Episodio activo"
+                        else -> "Episodio cerrado"
+                    },
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -701,7 +729,11 @@ private fun EpisodeCard(
             // La respuesta es opcional: quizá la persona aún no la registró.
             if (response == null) {
                 Text(
-                    text = "Sin respuesta registrada",
+                    text = if (episode.isDemo) {
+                        "Evento simulado; no requiere respuesta personal"
+                    } else {
+                        "Sin respuesta registrada"
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

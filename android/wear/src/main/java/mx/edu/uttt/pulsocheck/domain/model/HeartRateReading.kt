@@ -16,7 +16,7 @@ data class HeartRateReading(
     // Fecha y hora de la lectura, expresadas en milisegundos desde 1970.
     val measuredAtEpochMillis: Long,
 
-    // Origen real de la medición en el alcance de este proyecto.
+    // Identifica si el dato viene del sensor o de una prueba simulada.
     val origin: ReadingOrigin,
 )
 
@@ -25,4 +25,6 @@ data class HeartRateReading(
  */
 enum class ReadingOrigin {
     HEALTH_SERVICES_ON_WATCH,
+    // Dato artificial creado únicamente para validar la interfaz y sincronización.
+    DEMO_TEST,
 }

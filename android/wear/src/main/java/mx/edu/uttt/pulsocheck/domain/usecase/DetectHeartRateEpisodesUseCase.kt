@@ -3,6 +3,7 @@ package mx.edu.uttt.pulsocheck.domain.usecase
 import mx.edu.uttt.pulsocheck.domain.model.EpisodeStatus
 import mx.edu.uttt.pulsocheck.domain.model.HeartRateEpisode
 import mx.edu.uttt.pulsocheck.domain.model.HeartRateReading
+import mx.edu.uttt.pulsocheck.domain.model.ReadingOrigin
 
 /**
  * Aplica la regla de PulsoCheck a una lista de lecturas.
@@ -33,6 +34,8 @@ class DetectHeartRateEpisodesUseCase {
 
         // Elimina registros repetidos por sincronización y los ordena por hora.
         val orderedReadings = readings
+            // Las pruebas no participan en el análisis de lecturas reales.
+            .filter { it.origin != ReadingOrigin.DEMO_TEST }
             .distinctBy { it.id }
             .sortedBy { it.measuredAtEpochMillis }
 

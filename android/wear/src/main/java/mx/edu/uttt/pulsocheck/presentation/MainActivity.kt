@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
+import mx.edu.uttt.pulsocheck.BuildConfig
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material3.AppScaffold
@@ -105,6 +106,8 @@ fun WearApp(trackingViewModel: TrackingViewModel) {
     val episodes = trackingViewModel.episodios.collectAsState().value
     val pendingEpisode =
         trackingViewModel.episodioPendienteDeRespuesta.collectAsState().value
+    val demoEnCurso = trackingViewModel.demoEnCurso.collectAsState().value
+    val mensajeDemo = trackingViewModel.mensajeDemo.collectAsState().value
 
     // Android requiere pedir este permiso justo cuando la persona inicia la lectura.
     val heartRatePermission = if (Build.VERSION.SDK_INT >= 36) {
@@ -143,6 +146,13 @@ fun WearApp(trackingViewModel: TrackingViewModel) {
         iniciarConPermisoDelSensor()
     }
 
+    // La prueba solicita avisos por separado y no inicia el sensor por accidente.
+    val demoNotificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { _ ->
+        trackingViewModel.lanzarEpisodioDemo()
+    }
+
     PulsoCheckTheme {
         WearHomeScreen(
             episodes = episodes,
@@ -167,6 +177,25 @@ fun WearApp(trackingViewModel: TrackingViewModel) {
             },
             onStop = trackingViewModel::detenerSeguimiento,
             onFeelingSelected = trackingViewModel::registrarRespuesta,
+            onLaunchDemo = {
+                val notificationsGranted =
+                    Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                        ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.POST_NOTIFICATIONS,
+                        ) == PackageManager.PERMISSION_GRANTED
+
+                if (notificationsGranted) {
+                    trackingViewModel.lanzarEpisodioDemo()
+                } else {
+                    demoNotificationPermissionLauncher.launch(
+                        Manifest.permission.POST_NOTIFICATIONS,
+                    )
+                }
+            },
+            demoEnCurso = demoEnCurso,
+            demoMessage = mensajeDemo,
+            showDemoButton = BuildConfig.DEBUG,
         )
     }
 }
@@ -181,6 +210,10 @@ private fun WearHomeScreen(
     onStart: () -> Unit,
     onStop: () -> Unit,
     onFeelingSelected: (FeelingOption) -> Unit,
+    onLaunchDemo: () -> Unit,
+    demoEnCurso: Boolean,
+    demoMessage: String?,
+    showDemoButton: Boolean,
 ) {
     AppScaffold {
         val listState = rememberTransformingLazyColumnState()
@@ -239,10 +272,45 @@ private fun WearHomeScreen(
                     )
                 }
 
+                if (showDemoButton) {
+                    item {
+                        Button(
+                            onClick = onLaunchDemo,
+                            enabled = !demoEnCurso,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                if (demoEnCurso) "Preparando prueba…"
+                                else "Lanzar episodio DEMO",
+                            )
+                        }
+                    }
+
+                    item {
+                        Text(
+                            text = "Simula lecturas de 71–74 lpm. No usa el sensor ni cambia el umbral.",
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+
+                demoMessage?.let { message ->
+                    item {
+                        Text(
+                            text = message,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+
                 item {
                     val latestReading = readings.firstOrNull()
                     val message = latestReading?.let { reading ->
-                        "Última lectura: ${reading.beatsPerMinute} lpm"
+                        if (reading.origin == ReadingOrigin.DEMO_TEST) {
+                            "Última lectura simulada: ${reading.beatsPerMinute} lpm · DEMO"
+                        } else {
+                            "Última lectura: ${reading.beatsPerMinute} lpm"
+                        }
                     } ?: "Sin lecturas guardadas"
 
                     Text(
@@ -328,6 +396,10 @@ fun DefaultPreview() {
             onStart = {},
             onStop = {},
             onFeelingSelected = {},
+            onLaunchDemo = {},
+            demoEnCurso = false,
+            demoMessage = null,
+            showDemoButton = false,
         )
     }
 }

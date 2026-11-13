@@ -34,6 +34,8 @@ android {
     useLibrary("wear-sdk")
     buildFeatures {
         compose = true
+        // Habilita BuildConfig.DEBUG para mostrar la acción DEMO solo en desarrollo.
+        buildConfig = true
     }
 }
 
